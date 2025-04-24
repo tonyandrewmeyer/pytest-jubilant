@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "pytest-jubilant"
 version = "0.1.0"
@@ -8,3 +12,17 @@ dependencies = [
     "jubilant>=0.5.0",
     "pytest>=8.3.5",
 ]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+
+[project.urls]
+Homepage = "https://github.com/canonical/pytest-jubilant"
+Issues = "https://github.com/canonical/pytest-jubilant/issues"
+
+[project.entry-points.pytest11]
+interface_tester = "interface_tester"
+

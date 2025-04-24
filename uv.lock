@@ -68,7 +68,7 @@ wheels = [
 [[package]]
 name = "pytest-jubilant"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "jubilant" },
     { name = "pytest" },
