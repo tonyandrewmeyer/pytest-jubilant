@@ -20,20 +20,20 @@ def pytest_addoption(parser):
     )
     group.addoption(
         "--keep-models",
-        action="store",
-        default=None,
+        action="store_true",
+        default=False,
         help="Skip model teardown.",
     )
     group.addoption(
         "--no-setup",
-        action="store",
-        default=None,
+        action="store_true",
+        default=False,
         help='Skip tests marked with "setup".',
     )
     group.addoption(
         "--no-teardown",
-        action="store",
-        default=None,
+        action="store_true",
+        default=False,
         help='Skip tests marked with "teardown".',
     )
 
@@ -72,7 +72,8 @@ def juju(request):
             yield juju
 
 
-class _Result(dataclasses.dataclass):
+@dataclasses.dataclass
+class _Result:
     charm: Path
     resources: Optional[Dict[str, str]]
 
