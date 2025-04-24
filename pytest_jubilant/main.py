@@ -36,6 +36,12 @@ def pytest_addoption(parser):
         default=False,
         help='Skip tests marked with "teardown".',
     )
+    group.addoption(
+        "--switch",
+        action="store_true",
+        default=False,
+        help='Switch to the temporary model that is currently being worked on.',
+    )
 
 
 def pytest_configure(config):
@@ -48,13 +54,13 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    if not config.getoption("--no-teardown"):
+    if config.getoption("--no-teardown"):
         skipper = pytest.mark.skip(reason="--no-teardown provided.")
         for item in items:
             if "teardown" in item.keywords:
                 item.add_marker(skipper)
 
-    if not config.getoption("--no-setup"):
+    if config.getoption("--no-setup"):
         skipper = pytest.mark.skip(reason="--no-setup provided.")
         for item in items:
             if "setup" in item.keywords:
@@ -63,13 +69,21 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture(scope="module")
 def juju(request):
+    switch = request.config.getoption("--switch")
+    def _maybe_switch(juju):
+        if switch:
+            juju.cli("switch", model, include_model=False)
+        return juju
+
     if model := request.config.getoption("--model"):
-        yield jubilant.Juju(model=model)
+        juju = jubilant.Juju(model=model)
+        yield _maybe_switch(juju)
+
     else:
         with jubilant.temp_model(
             keep=request.config.getoption("--keep-models")
         ) as juju:
-            yield juju
+            yield _maybe_switch(juju)
 
 
 @dataclasses.dataclass
