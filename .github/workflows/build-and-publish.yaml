@@ -19,9 +19,7 @@ jobs:
       run: |
         # strip the 'v' prefix
         TAG=$(git describe --tags --abbrev=0 | cut -c 2-)
-        pwd
-        ls
-        echo "__version__ = \"$TAG\"" > pytest-jubilant/pytest_jubilant/version.py
+        echo "__version__ = \"$TAG\"" > pytest_jubilant/version.py
     - name: Install pypa/build
       run: >-
         python3 -m
