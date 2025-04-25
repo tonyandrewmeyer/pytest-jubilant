@@ -115,7 +115,7 @@ import pytest
 def test_build_deploy_charm(juju):
     out = pack_charm("/path/to/foo-charm-repo-root-dir/")
     juju.deploy(
-        out.charm,
+        f"./{out.charm}",
         "foo",
         # the resources can only be inferred from the charm's metadata/charmcraft yaml 
         # if you use the `upstream-source` convention
