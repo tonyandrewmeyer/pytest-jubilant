@@ -114,10 +114,11 @@ def pack_charm(root: Union[Path, str] = "./") -> _Result:
     )
 
     # Don't ask me why this goes to stderr.
-    charm = proc.stderr.strip().splitlines()[-1].split()[-1]
+    # FIXME: support multiple-charm outputs if there is more than one platform.
+    charm = Path(proc.stderr.strip().splitlines()[-1].split()[-1])
 
     for meta_name in ("metadata.yaml", "charmcraft.yaml"):
-        if (meta_yaml := root / meta_name).exists():
+        if (meta_yaml := Path(root) / meta_name).exists():
             logging.debug(f"found metadata file: {meta_yaml}")
             meta = yaml.safe_load(meta_yaml.read_text())
             resources = {
