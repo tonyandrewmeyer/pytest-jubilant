@@ -16,10 +16,11 @@ jobs:
       with:
         python-version: "3.x"
     - name: Update version
-      if: startsWith(github.ref, 'refs/tags/')  # only update version on tag pushes
       run: |
         # strip the 'v' prefix
         TAG=$(git describe --tags --abbrev=0 | cut -c 2-)
+        pwd
+        ls
         echo "__version__ = \"$TAG\"" > pytest-jubilant/pytest_jubilant/version.py
     - name: Install pypa/build
       run: >-
