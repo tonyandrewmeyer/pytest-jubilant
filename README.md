@@ -6,7 +6,7 @@ And some cool stuff on top.
 # Fixtures
 
 ## `juju` 
-This is a model-scoped fixture that, by default, uses a temporary model and tears it down on context exit.
+This is a module(and model!)-scoped fixture that, by default, uses a temporary model and tears it down on context exit.
 Cfr. the `--model`, `--keep-models`, and `--no-teardown` options below for more.
 Usage:
 
