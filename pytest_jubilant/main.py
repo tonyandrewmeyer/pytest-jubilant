@@ -101,8 +101,8 @@ class TempModelFactory:
             juju.add_model(model)
         except jubilant.CLIError as e:
             if (
-                "already exists on this k8s cluster" in e.args[1]
-                and self._check_models_unique
+                    "already exists on this k8s cluster" in e.args[1]
+                    and self._check_models_unique
             ):
                 raise
 
@@ -122,7 +122,12 @@ def temp_model_factory(request):
 
     yield factory
 
-    if not request.config.getoption("--keep-models"):
+    # user-model and no-teardown both imply keep-models
+    if (
+            user_model or
+            request.config.getoption("--no-teardown") or
+            not request.config.getoption("--keep-models")
+    ):
         # TODO: jubilant defaults to --force, but is that a good idea?
         factory.teardown(force=True)
 
