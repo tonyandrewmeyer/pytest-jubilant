@@ -1,5 +1,8 @@
 name: Tests
 
+permissions:
+  contents: write
+
 on:
   pull_request:
     branches:
@@ -19,8 +22,6 @@ on:
         with:
           python-version: 3.8
       - name: Lint
-        permissions:
-          contents: write
         run: |
           sudo snap install astral-uv --classic
           cd pytest-jubilant
@@ -39,8 +40,6 @@ on:
         with:
           python-version: 3.8
       - name: Unit tests
-        permissions:
-          contents: write
         run: |
           sudo snap install astral-uv --classic
           cd pytest-jubilant
