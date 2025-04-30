@@ -24,7 +24,6 @@ jobs:
       - name: Lint
         run: |
           sudo snap install astral-uv --classic
-          cd pytest-jubilant
           uvx tox -e lint
 
   unittest:
@@ -42,5 +41,4 @@ jobs:
       - name: Unit tests
         run: |
           sudo snap install astral-uv --classic
-          cd pytest-jubilant
           uvx tox -e unit
