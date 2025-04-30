@@ -132,7 +132,6 @@ def temp_model_factory(request):
 
     yield factory
 
-    # user-model implies keep-models
     if not request.config.getoption("--keep-models"):
         # TODO: jubilant defaults to --force, but is that a good idea?
         factory.teardown(force=True)
