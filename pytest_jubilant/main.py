@@ -5,14 +5,17 @@
 """Main plugin module."""
 import dataclasses
 import logging
+import os
+import secrets
 import shlex
 import subprocess
 from pathlib import Path
 from typing import Union, Optional, Dict
+from unittest.mock import MagicMock, patch
 
-import yaml
-import pytest
 import jubilant
+import pytest
+import yaml
 
 
 def pytest_addoption(parser):
@@ -45,8 +48,11 @@ def pytest_addoption(parser):
         "--switch",
         action="store_true",
         default=False,
-        help='Switch to the temporary model that is currently being worked on.',
+        help="Switch to the temporary model that is currently being worked on.",
     )
+
+
+_cli_mock: Optional[MagicMock] = None
 
 
 def pytest_configure(config):
@@ -57,8 +63,22 @@ def pytest_configure(config):
         "markers", "teardown: tests that tear down some parts of the environment."
     )
 
+    if os.getenv("PYTESTING_PYTEST_JUBILANT"):
+        mm = MagicMock()
+        mm.stdout = ""
+        mm.stderr = ""
+        ctx = patch("subprocess.run", mm)
+        ctx.__enter__()
+        global _cli_mock
+        _cli_mock = mm
 
-def pytest_collection_modifyitems(config:pytest.Config, items):
+
+def pytest_collection_modifyitems(config: pytest.Config, items):
+    def _set_keep_models(val: bool = True):
+        # TODO: less hacky way to do this?
+        optname = config._opt2dest.get("--keep-models", "--keep-models")  # noqa
+        config.option.__setattr__(optname, val)
+
     if config.getoption("--no-teardown"):
         skipper = pytest.mark.skip(reason="--no-teardown provided.")
         for item in items:
@@ -68,9 +88,7 @@ def pytest_collection_modifyitems(config:pytest.Config, items):
         if config.getoption("--keep-models"):
             logging.warning("--no-teardown implies --keep-models")
         else:
-            # TODO: less hacky way to do this?
-            optname = config._opt2dest.get("--keep-models", "--keep-models")  # noqa
-            config.option.__setattr__(optname, True)
+            _set_keep_models(True)
 
     if config.getoption("--no-setup"):
         skipper = pytest.mark.skip(reason="--no-setup provided.")
@@ -79,23 +97,81 @@ def pytest_collection_modifyitems(config:pytest.Config, items):
                 item.add_marker(skipper)
 
 
-@pytest.fixture(scope="module")
-def juju(request):
-    switch = request.config.getoption("--switch")
-    def _maybe_switch(juju):
-        if switch:
-            juju.cli("switch", model, include_model=False)
+class TempModelFactory:
+    """Manages temporary models for testing."""
+
+    def __init__(self, prefix: str, check_models_unique: bool = True):
+        self.prefix = prefix
+        self._models: Dict[str, jubilant.Juju] = {}
+        self._check_models_unique = check_models_unique
+
+    def get_juju(self, suffix: str) -> jubilant.Juju:
+        model = self.prefix + suffix
+        if model in self._models:
+            raise ValueError(
+                f"model {model} already registered on this temp_model factory. "
+                "choose a different prefix."
+            )
+
+        juju = jubilant.Juju(model=model)
+        try:
+            juju.add_model(model)
+        except jubilant.CLIError as e:
+            # If --model is set (_check_models_unique is False), then the user wants collisions.
+            # If the name is randomly generated, the chance of colliding with another
+            # randomly generated model that wasn't torn down is tiny, but still present.
+            if (
+                "already exists on this k8s cluster" in e.args[1]
+                and self._check_models_unique
+            ):
+                raise
+
+        self._models[model] = juju
         return juju
 
-    if model := request.config.getoption("--model"):
-        juju = jubilant.Juju(model=model)
-        yield _maybe_switch(juju)
+    def teardown(self, force: bool = False):
+        for model, juju in self._models.items():
+            juju.destroy_model(model, destroy_storage=True, force=force)
 
+
+@pytest.fixture(scope="module")
+def cli_mock(request):
+    yield _cli_mock
+
+
+@pytest.fixture(scope="module")
+def temp_model_factory(request):
+    user_model = request.config.getoption("--model")
+    if user_model:
+        prefix = user_model
     else:
-        with jubilant.temp_model(
-            keep=request.config.getoption("--keep-models")
-        ) as juju:
-            yield _maybe_switch(juju)
+        sanitized_module_name = (request.module.__name__.rpartition(".")[-1]).replace(
+            "_", "-"
+        )
+        randbits = (
+            "testing"
+            if os.getenv("PYTESTING_PYTEST_JUBILANT")
+            else secrets.token_hex(4)
+        )
+        prefix = f"{sanitized_module_name}-{randbits}"
+    factory = TempModelFactory(prefix=prefix, check_models_unique=not user_model)
+
+    yield factory
+
+    if not request.config.getoption("--keep-models"):
+        # TODO: jubilant defaults to --force, but is that a good idea?
+        factory.teardown(force=True)
+
+    if _cli_mock:
+        _cli_mock.reset_mock()
+
+
+@pytest.fixture(scope="module")
+def juju(request, temp_model_factory):
+    juju = temp_model_factory.get_juju("")
+    if request.config.getoption("--switch"):
+        juju.cli("switch", juju.model, include_model=False)
+    return juju
 
 
 @dataclasses.dataclass

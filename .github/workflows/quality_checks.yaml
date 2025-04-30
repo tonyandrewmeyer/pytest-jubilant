@@ -1,42 +1,44 @@
 name: Tests
 
+permissions:
+  contents: write
+
 on:
   pull_request:
     branches:
       - main
 
-
 jobs:
-  linting:
+  lint:
     name: Linting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
       - name: Set up python
         uses: actions/setup-python@v4
         with:
           python-version: 3.8
-      - name: Install dependencies
-        run: python -m pip install tox
-      - name: Run tests
-        run: tox -vve lint
+      - name: Lint
+        run: |
+          sudo snap install astral-uv --classic
+          uv run --active --with black black --check ./
 
-  unit-test:
+  unittest:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
       - name: Set up python
         uses: actions/setup-python@v4
         with:
           python-version: 3.8
-      - name: Install dependencies
-        run: python -m pip install tox
-      - name: Run tests
-        run: tox -vve unit
+      - name: Unit tests
+        run: |
+          sudo snap install astral-uv --classic
+          uv run --with pytest pytest -v --tb native ./tests --log-cli-level=DEBUG
