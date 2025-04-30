@@ -92,7 +92,7 @@ class TempModelFactory:
         self._check_models_unique = check_models_unique
 
     def get_juju(self, suffix: str) -> jubilant.Juju:
-        model = self.prefix + "-" + suffix
+        model = self.prefix + suffix
         if model in self._models:
             raise ValueError(
                 f"model {model} already registered on this temp_model factory. "
