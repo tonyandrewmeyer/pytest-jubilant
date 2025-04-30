@@ -5,8 +5,7 @@ on:
     branches:
       - main
 
-
-jobs:
+  jobs:
   linting:
     name: Linting
     runs-on: ubuntu-latest
@@ -20,9 +19,9 @@ jobs:
         with:
           python-version: 3.8
       - name: Lint
+        permissions:
+          contents: write
         run: |
-          pwd
-          ls
           sudo snap install astral-uv --classic
           cd pytest-jubilant
           uvx tox -e lint
@@ -40,6 +39,8 @@ jobs:
         with:
           python-version: 3.8
       - name: Unit tests
+        permissions:
+          contents: write
         run: |
           sudo snap install astral-uv --classic
           cd pytest-jubilant
