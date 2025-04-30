@@ -5,11 +5,13 @@
 """Main plugin module."""
 import dataclasses
 import logging
+import os
 import secrets
 import shlex
 import subprocess
 from pathlib import Path
 from typing import Union, Optional, Dict
+from unittest.mock import MagicMock, patch
 
 import jubilant
 import pytest
@@ -50,6 +52,9 @@ def pytest_addoption(parser):
     )
 
 
+_cli_mock: Optional[MagicMock] = None
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers", "setup: tests that setup some parts of the environment."
@@ -57,6 +62,15 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "teardown: tests that tear down some parts of the environment."
     )
+
+    if os.getenv("PYTESTING_PYTEST_JUBILANT"):
+        mm = MagicMock()
+        mm.stdout = ""
+        mm.stderr = ""
+        ctx = patch("subprocess.run", mm)
+        ctx.__enter__()
+        global _cli_mock
+        _cli_mock = mm
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items):
@@ -121,13 +135,25 @@ class TempModelFactory:
 
 
 @pytest.fixture(scope="module")
+def cli_mock(request):
+    yield _cli_mock
+
+
+@pytest.fixture(scope="module")
 def temp_model_factory(request):
     user_model = request.config.getoption("--model")
     if user_model:
         prefix = user_model
     else:
-        sanitized_module_name = (request.module.__name__.rpartition(".")[-1]).replace("_", "-")
-        prefix = f"{sanitized_module_name}-{secrets.token_hex(4)}"
+        sanitized_module_name = (request.module.__name__.rpartition(".")[-1]).replace(
+            "_", "-"
+        )
+        randbits = (
+            "testing"
+            if os.getenv("PYTESTING_PYTEST_JUBILANT")
+            else secrets.token_hex(4)
+        )
+        prefix = f"{sanitized_module_name}-{randbits}"
     factory = TempModelFactory(prefix=prefix, check_models_unique=not user_model)
 
     yield factory
@@ -136,10 +162,13 @@ def temp_model_factory(request):
         # TODO: jubilant defaults to --force, but is that a good idea?
         factory.teardown(force=True)
 
+    if _cli_mock:
+        _cli_mock.reset_mock()
+
 
 @pytest.fixture(scope="module")
 def juju(request, temp_model_factory):
-    juju = temp_model_factory.get_juju("root")
+    juju = temp_model_factory.get_juju("")
     if request.config.getoption("--switch"):
         juju.cli("switch", juju.model, include_model=False)
     return juju
