@@ -21,6 +21,46 @@ def test_deploy(juju: Juju):
     )
 ```
 
+## `temp_model_factory`
+This is a module-scoped fixture that manages temporary models for your test runs. 
+It is what the `juju` fixture is using behind the scenes. 
+
+Especially useful if you have test cases that require multiple models.
+```python
+import pytest
+from jubilant import Juju, all_active
+
+@pytest.fixture
+def istio(temp_model_factory):
+    yield temp_model_factory.get_juju(suffix="istio")
+    
+    
+def test_cmr(juju: Juju, istio: Juju):
+    istio.deploy("istio-k8s", "istio")
+    istio.wait(
+        lambda status: all_active(status, "istio"),
+        timeout=1000
+    )
+
+    juju.deploy("./foo.charm", "foo")
+    juju.wait(
+        lambda status: all_active(status, "foo"),
+        timeout=1000
+    )
+
+    juju.cli("offer", "foo:bar") 
+    istio.cli("consume", f"{juju.model}:foo")
+    istio.cli("relate", "istio", "foo:bar")
+```
+
+This test will spin up two temporary models, one called `test-cmr-<randomhex>`, and one called `test-cmr-<randomhex>istio`, 
+and tear them down on context exit.
+
+This fixture can be used with the options described below:
+- `pytest tests/test_cmr.py --keep-models` will skip model teardown for all generated models.
+- `pytest tests/test_cmr.py --model test-cmr-<randomhex>` will use `test-cmr-<randomhex>` as base name, and the suffixes you defined in the fixtures will give all generated models predictable names, which means that the tests will reuse the existing models (if found) or create new ones with those names.
+- `pytest tests/test_cmr.py --switch` will switch you to the 'base' model `test-cmr-<randomhex>` (not to one of the suffixed ones!).
+
 
 # Pytest CLI options
 
@@ -48,7 +88,6 @@ Usage:
 
 ## `--no-teardown`
 Skip all tests marked with `teardown`. Useful to inspect the state of a model after a (failed) test run.
-Implies `--keep-models`.
 
     pytest ./tests/integration --no-teardown 
 
