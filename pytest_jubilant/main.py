@@ -204,7 +204,9 @@ def pack_charm(root: Union[Path, str] = "./") -> _Result:
                 }
             else:
                 resources = None
-                logging.info(f"resources not found in {meta_name}; proceeding without resources")
+                logging.info(
+                    f"resources not found in {meta_name}; proceeding without resources"
+                )
             break
     else:
         resources = None
