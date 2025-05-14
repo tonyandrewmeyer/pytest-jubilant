@@ -198,7 +198,7 @@ def pack(root: Union[Path, str] = "./") -> Path:
     # Don't ask me why this goes to stderr.
     # FIXME: support multiple-charm outputs if there is more than one platform.
     charm = Path(proc.stderr.strip().splitlines()[-1].split()[-1])
-    return charm
+    return charm.absolute()
 
 
 def get_resources(root: Union[Path, str] = "./") -> Optional[Dict[str, str]]:

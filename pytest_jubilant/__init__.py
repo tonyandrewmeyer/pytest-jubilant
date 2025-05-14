@@ -6,4 +6,4 @@
 
 from pytest_jubilant.main import pack_charm
 
-__all__ = ["pack_charm"]
+__all__ = ["pack_charm", "pack", "get_resources"]

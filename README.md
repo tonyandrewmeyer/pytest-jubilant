@@ -142,23 +142,24 @@ def test_destroy(juju):
 
 # Utilities
 
-## `pack_charm`
+## `pack`
 
 Wrapper around `charmcraft pack` to build a charm and return the packed charm path and its resources, ready to be passed to `juju.deploy`.
 
 ```python
-from pytest_jubilant import pack_charm
+from pytest_jubilant import pack, get_resources
 import pytest
+
 
 @pytest.mark.setup
 def test_build_deploy_charm(juju):
-    out = pack_charm("/path/to/foo-charm-repo-root-dir/")
+    charm_root = "/path/to/foo-charm-repo-root-dir/"
     juju.deploy(
-        f"./{out.charm}",
+        pack(charm_root),
         "foo",
         # the resources can only be inferred from the charm's metadata/charmcraft yaml 
         # if you use the `upstream-source` convention
-        resources=out.resources,
+        resources=get_resources(charm_root),
         num_units=3,
     )
 ```
