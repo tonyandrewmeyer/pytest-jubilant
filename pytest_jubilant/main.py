@@ -50,6 +50,13 @@ def pytest_addoption(parser):
         default=False,
         help="Switch to the temporary model that is currently being worked on.",
     )
+    group.addoption(
+        "--jdl-dir",
+        action="store",
+        default="./.pytest_jubilant_jdl",
+        help="Directory in which to dump any juju debug-log for any model prior to tearing it down. "
+             "Set to empty string to disable the behaviour.",
+    )
 
 
 _cli_mock: Optional[MagicMock] = None
@@ -129,6 +136,13 @@ class TempModelFactory:
         self._models[model] = juju
         return juju
 
+    def dump_all_logs(self, path: Path):
+        for model, juju in self._models.items():
+            jdl = juju.cli('debug-log', '--replay')
+            jdl_path = path / model
+            jdl_path.write_text(jdl)
+            logging.info(f"dropping jdl for model {model} to {jdl_path}")
+
     def teardown(self, force: bool = False):
         for model, juju in self._models.items():
             juju.destroy_model(model, destroy_storage=True, force=force)
@@ -157,6 +171,10 @@ def temp_model_factory(request):
     factory = TempModelFactory(prefix=prefix, check_models_unique=not user_model)
 
     yield factory
+
+    # BEFORE tearing down the models, dump any and all juju debug-logs
+    if jdl_dir := request.config.getoption("--jdl-dir"):
+        factory.dump_all_logs(Path(jdl_dir))
 
     if not request.config.getoption("--keep-models"):
         # TODO: jubilant defaults to --force, but is that a good idea?
