@@ -126,6 +126,10 @@ Usage:
     # once the tests are done, you'll find the logs in 
     # ./debug_logs/test-ingress-c372ef49-jdl.txt (random bits may vary).
 
+    pytest ./tests/integration ./integration/test_ingress.py --model foo --dump-logs=./debug_logs
+    # once the tests are done, you'll find the logs in
+    # ./debug_logs/foo-jdl.txt
+
     pytest ./tests/integration ./integration/test_ingress.py --dump-logs=""
     # no logs will be saved
 
