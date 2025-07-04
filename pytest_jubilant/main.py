@@ -54,7 +54,7 @@ def pytest_addoption(parser):
         help="Switch to the temporary model that is currently being worked on.",
     )
     group.addoption(
-        "--jdl-dir",
+        "--dump-logs",
         action="store",
         default=DEFAULT_JDL_DUMP_PATH,
         help="Directory in which to dump any juju debug-log for any model prior to tearing it down. "
@@ -183,8 +183,8 @@ def temp_model_factory(request):
     yield factory
 
     # BEFORE tearing down the models, dump any and all juju debug-logs
-    if jdl_dir := request.config.getoption("--jdl-dir"):
-        factory.dump_all_logs(Path(jdl_dir))
+    if dump_logs := request.config.getoption("--dump-logs"):
+        factory.dump_all_logs(Path(dump_logs))
 
     if not request.config.getoption("--keep-models"):
         # TODO: jubilant defaults to --force, but is that a good idea?
