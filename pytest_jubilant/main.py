@@ -10,7 +10,7 @@ import secrets
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Union, Optional, Dict, List
+from typing import Union, Optional, Dict
 from unittest.mock import MagicMock, patch
 
 import jubilant
@@ -214,8 +214,9 @@ def pack_charm(root: Union[Path, str] = "./") -> _Result:
     return _Result(pack(root), get_resources(root))
 
 
-def _pack(root: Union[Path, str]):
-    cmd = f"charmcraft pack -p {root}"
+def _pack(root: Union[Path, str], platform: Optional[str] = None):
+    _platform = f" --platform {platform}" if platform else ""
+    cmd = f"charmcraft pack -p {root}{_platform}"
     proc = subprocess.run(
         shlex.split(cmd),
         check=True,
@@ -238,26 +239,24 @@ def _pack(root: Union[Path, str]):
             packed_charms.append(line.split()[1])
 
     if not packed_charms:
-        raise ValueError(f"unable to get packed charm(s) ({cmd!r} completed with {proc.returncode=}, {proc.stdout=}, {proc.stderr=})")
+        raise ValueError(
+            f"unable to get packed charm(s) ({cmd!r} completed with {proc.returncode=}, {proc.stdout=}, {proc.stderr=})"
+        )
 
     return packed_charms
 
 
-def pack(root: Union[Path, str] = "./") -> Path:
+def pack(root: Union[Path, str] = "./", platform: Optional[str] = None) -> Path:
     """Pack a local charm and return it."""
-    packed_charms = _pack(root)
+    packed_charms = _pack(root, platform)
 
-    if len(packed_charms)>1:
-        logging.warn("This charm supports multiple platforms. "
-                     "Use pack_multiplatform instead. "
-                     "Returning any one of them for now...")
+    if len(packed_charms) > 1:
+        raise ValueError(
+            "This charm supports multiple platforms. "
+            "Pass a `platform` argument to control which charm you're getting instead."
+        )
 
     return Path(packed_charms[0])
-
-
-def pack_multiplatform(root: Union[Path, str] = "./") -> List[Path]:
-    """Pack a local charm and return all resulting charm artifacts."""
-    return _pack(root)
 
 
 def get_resources(root: Union[Path, str] = "./") -> Optional[Dict[str, str]]:
