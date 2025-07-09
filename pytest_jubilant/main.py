@@ -10,7 +10,7 @@ import secrets
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Union, Optional, Dict
+from typing import Union, Optional, Dict, List
 from unittest.mock import MagicMock, patch
 
 import jubilant
@@ -214,19 +214,50 @@ def pack_charm(root: Union[Path, str] = "./") -> _Result:
     return _Result(pack(root), get_resources(root))
 
 
-def pack(root: Union[Path, str] = "./") -> Path:
-    """Pack a local charm and return it."""
+def _pack(root: Union[Path, str]):
+    cmd = f"charmcraft pack -p {root}"
     proc = subprocess.run(
-        shlex.split(f"charmcraft pack -p {root}"),
+        shlex.split(cmd),
         check=True,
         capture_output=True,
         text=True,
     )
 
+    # The output looks like:
+    # ❯ charmcraft pack
+    # Packed tempo-coordinator-k8s_ubuntu@24.04-amd64.charm
+    # Packed tempo-coordinator-k8s_ubuntu@22.04-amd64.charm
+
     # Don't ask me why this goes to stderr.
-    # FIXME: support multiple-charm outputs if there is more than one platform.
-    charm = Path(proc.stderr.strip().splitlines()[-1].split()[-1])
-    return charm.absolute()
+    output = proc.stderr
+
+    # we parse it and collect all the built charms.
+    packed_charms = []
+    for line in output.strip().splitlines():
+        if line.startswith("Packed"):
+            packed_charms.append(line.split()[1])
+
+    if not packed_charms:
+        raise ValueError(f"unable to get packed charm(s) ({cmd!r} completed with {proc.returncode=}, {proc.stdout=}, {proc.stderr=})")
+
+    return packed_charms
+
+
+def pack(root: Union[Path, str] = "./") -> Path:
+    """Pack a local charm and return it."""
+    packed_charms = _pack(root)
+
+    if len(packed_charms)>1:
+        logging.warn("This charm supports multiple platforms. "
+                     "Use pack_multiplatform instead. "
+                     "Returning any one of them for now...")
+
+    return Path(packed_charms[0])
+
+
+def pack_multiplatform(root: Union[Path, str] = "./") -> List[Path]:
+    """Pack a local charm and return all resulting charm artifacts."""
+    return _pack(root)
 
 
 def get_resources(root: Union[Path, str] = "./") -> Optional[Dict[str, str]]:
