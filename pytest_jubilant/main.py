@@ -208,13 +208,6 @@ class _Result:
     resources: Optional[Dict[str, str]]
 
 
-def pack_charm(root: Union[Path, str] = "./") -> _Result:
-    """Deprecated."""
-    raise DeprecationWarning(
-        "DEPRECATED. use `pack()` and `get_resources()` directly instead"
-    )
-
-
 def _pack(root: Union[Path, str], platform: Optional[str] = None):
     _platform = f" --platform {platform}" if platform else ""
     cmd = f"charmcraft pack -p {root}{_platform}"
