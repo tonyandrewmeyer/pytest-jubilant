@@ -13,7 +13,7 @@ def tempo(temp_model_factory):
     yield temp_model_factory.get_juju(suffix="tempo")
 
 
-def test_multimodel(juju, istio, tempo, cli_mock):
+def test_multimodel(cli_mock, juju, istio, tempo):
     assert istio.model == juju.model + "-istio"
     assert tempo.model == juju.model + "-tempo"
 

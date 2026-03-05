@@ -1,7 +1,7 @@
 from unittest.mock import call
 
 
-def test_rootmodel(juju, cli_mock):
+def test_rootmodel(cli_mock, juju):
     juju.deploy("something")
 
     assert cli_mock.called
