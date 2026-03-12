@@ -4,15 +4,14 @@
 
 """Main plugin module."""
 
+from __future__ import annotations
+
 import dataclasses
 import logging
-import os
 import secrets
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Union, Optional, Dict
-from unittest.mock import MagicMock, patch
 
 import jubilant
 import pytest
@@ -64,9 +63,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "setup: tests that setup some parts of the environment."
-    )
+    config.addinivalue_line("markers", "setup: tests that setup some parts of the environment.")
     config.addinivalue_line(
         "markers", "teardown: tests that tear down some parts of the environment."
     )
@@ -75,7 +72,7 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config: pytest.Config, items):
     def _set_keep_models(val: bool = True):
         # TODO: less hacky way to do this?
-        optname = config._opt2dest.get("--keep-models", "--keep-models")  # noqa
+        optname = config._opt2dest.get("--keep-models", "--keep-models")
         config.option.__setattr__(optname, val)
 
     if config.getoption("--no-teardown"):
@@ -102,12 +99,12 @@ class TempModelFactory:
     def __init__(
         self,
         prefix: str,
-        randbits: Optional[str] = None,
+        randbits: str | None = None,
         check_models_unique: bool = True,
     ):
         self.prefix = prefix
         self.randbits = randbits
-        self._models: Dict[str, jubilant.Juju] = {}
+        self._models: dict[str, jubilant.Juju] = {}
         self._check_models_unique = check_models_unique
 
     def get_juju(self, suffix: str) -> jubilant.Juju:
@@ -125,10 +122,7 @@ class TempModelFactory:
             # If --model is set (_check_models_unique is False), then the user wants collisions.
             # If the name is randomly generated, the chance of colliding with another
             # randomly generated model that wasn't torn down is tiny, but still present.
-            if (
-                "already exists on this k8s cluster" in e.args[1]
-                and self._check_models_unique
-            ):
+            if "already exists on this k8s cluster" in e.args[1] and self._check_models_unique:
                 raise
 
         self._models[model_name] = juju
@@ -182,12 +176,12 @@ def juju(request, temp_model_factory):
 @dataclasses.dataclass
 class _Result:
     charm: Path
-    resources: Optional[Dict[str, str]]
+    resources: dict[str, str] | None
 
 
-def _pack(root: Union[Path, str], platform: Optional[str] = None):
-    _platform = f" --platform {platform}" if platform else ""
-    cmd = f"charmcraft pack -p {root}{_platform}"
+def _pack(root: Path | str, platform: str | None = None):
+    platform_ = f" --platform {platform}" if platform else ""
+    cmd = f"charmcraft pack -p {root}{platform_}"
     proc = subprocess.run(
         shlex.split(cmd),
         check=True,
@@ -204,10 +198,9 @@ def _pack(root: Union[Path, str], platform: Optional[str] = None):
     output = proc.stderr
 
     # we parse it and collect all the built charms.
-    packed_charms = []
-    for line in output.strip().splitlines():
-        if line.startswith("Packed"):
-            packed_charms.append(line.split()[1])
+    packed_charms = [
+        line.split()[1] for line in output.strip().splitlines() if line.startswith("Packed")
+    ]
 
     if not packed_charms:
         raise ValueError(
@@ -217,7 +210,7 @@ def _pack(root: Union[Path, str], platform: Optional[str] = None):
     return packed_charms
 
 
-def pack(root: Union[Path, str] = "./", platform: Optional[str] = None) -> Path:
+def pack(root: Path | str = "./", platform: str | None = None) -> Path:
     """Pack a local charm and return it."""
     packed_charms = _pack(root, platform)
 
@@ -230,7 +223,7 @@ def pack(root: Union[Path, str] = "./", platform: Optional[str] = None) -> Path:
     return Path(packed_charms[0]).resolve()
 
 
-def get_resources(root: Union[Path, str] = "./") -> Optional[Dict[str, str]]:
+def get_resources(root: Path | str = "./") -> dict[str, str] | None:
     """Obtain the charm resources from metadata.yaml's upstream-source fields."""
     for meta_name in ("metadata.yaml", "charmcraft.yaml"):
         if (meta_yaml := Path(root) / meta_name).exists():
@@ -249,14 +242,10 @@ def get_resources(root: Union[Path, str] = "./") -> Optional[Dict[str, str]]:
                     raise
             else:
                 resources = None
-                logging.info(
-                    f"resources not found in {meta_name}; proceeding without resources"
-                )
+                logging.info(f"resources not found in {meta_name}; proceeding without resources")
             break
     else:
         resources = None
-        logging.error(
-            f"metadata/charmcraft.yaml not found at {root}; unable to load resources"
-        )
+        logging.error(f"metadata/charmcraft.yaml not found at {root}; unable to load resources")
 
     return resources
