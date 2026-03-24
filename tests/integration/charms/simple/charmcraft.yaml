@@ -16,3 +16,11 @@ parts:
     source: .
     build-snaps:
       - astral-uv
+
+actions:
+  log:
+    description: Make a lot of logging calls.
+    additionalProperties: false
+  log-fail:
+    description: Make a lot of logging calls, then fail.
+    additionalProperties: false
