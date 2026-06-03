@@ -34,6 +34,10 @@ _MODEL_PREFIX_KEY = pytest.StashKey[str]()
 
 
 def pytest_addoption(parser: pytest.Parser):
+    """Register the ``--juju-*`` command-line options under the "jubilant" group.
+
+    Pytest hook: https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_addoption
+    """
     group = parser.getgroup("jubilant")
     group.addoption(
         "--juju-model",
@@ -72,6 +76,10 @@ def pytest_addoption(parser: pytest.Parser):
 
 
 def pytest_configure(config: pytest.Config):
+    """Register the ``juju_setup`` and ``juju_teardown`` markers, and validate option combinations.
+
+    Pytest hook: https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_configure
+    """
     config.addinivalue_line(
         "markers", "juju_setup: tests that setup some parts of the environment."
     )
@@ -117,6 +125,10 @@ def pytest_terminal_summary(
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]):
+    """Skip ``juju_setup``/``juju_teardown`` tests when the matching ``--no-juju-*`` flag is set.
+
+    Pytest hook: https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_collection_modifyitems
+    """
     if config.getoption("--no-juju-teardown"):
         skipper = pytest.mark.skip(reason="--no-juju-teardown provided.")
         for item in items:
@@ -131,7 +143,21 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 class JujuFactory(typing.Protocol):
-    def get_juju(self, suffix: str) -> jubilant.Juju: ...
+    """Protocol for a factory of per-test temporary Juju models.
+
+    Used as a type annotation for fixtures yielding the concrete
+    factory (see the ``juju_factory`` fixture).
+    """
+
+    def get_juju(self, suffix: str) -> jubilant.Juju:
+        """Return a `jubilant.Juju` for a model named `<prefix>-<suffix>`.
+
+        `<prefix>` is the factory's configured model-name prefix. If `suffix`
+        is empty, the model is named `<prefix>`. The same factory cannot
+        return two `Juju` instances for the same model name; raises
+        `ValueError` if called twice with the same `suffix`.
+        """
+        ...
 
 
 class _JujuFactory:
@@ -193,7 +219,7 @@ class _JujuFactory:
             if self._log_path:
                 jdl_path = self._log_path / (model + "-juju-debug.log")
                 jdl_path.write_text(jdl)
-                logging.info(f"Wrote full `juju debug-log` for model {model} to {jdl_path}")
+                logging.info("Wrote full `juju debug-log` for model %s to %s", model, jdl_path)
 
     def _teardown(self, force: bool = False):
         for model, juju in self._models.items():
@@ -233,6 +259,12 @@ def juju_factory(
     _sleep_once: Callable[[], None],
     _model_prefix: str,
 ):
+    """Module-scoped factory for creating one or more temporary Juju models.
+
+    Use this when a test module needs more than one model. For the common
+    single-model case, use the `juju` fixture instead. Models created via this
+    factory are torn down at module teardown unless `--no-juju-teardown` is set.
+    """
     module_name = typing.cast("str", request.module.__name__)  # type: ignore
     module_part = module_name.rpartition(".")[-1].replace("_", "-")
     dump_logs = typing.cast("pathlib.Path | None", request.config.getoption("--juju-dump-logs"))
@@ -252,12 +284,19 @@ def juju_factory(
     factory._dump_all_logs(also_log_lines=also_log_lines)  # pyright: ignore[reportPrivateUsage]
 
     if not request.config.getoption("--no-juju-teardown"):
-        # TODO: jubilant defaults to --force, but is that a good idea?
+        # Match jubilant's temp_model fixture: --force so failed tests with apps
+        # in error states don't hang teardown.
         factory._teardown(force=True)  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest, juju_factory: JujuFactory):
+    """Module-scoped temporary Juju model.
+
+    Returns a `jubilant.Juju` bound to a freshly created model that lives for
+    the duration of the test module. Pass `--juju-switch` to make this the
+    active model in your local `juju` CLI while the tests run.
+    """
     juju = juju_factory.get_juju("")
     if request.config.getoption("--juju-switch"):
         assert juju.model  # noqa: S101
