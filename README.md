@@ -212,6 +212,19 @@ pytest tests/integration -k test_something --juju-model hello --juju-switch
 ```
 
 
+### `--juju-skip-on-failure`
+
+When a test marked with [juju_setup](#juju_setup) fails, skip the remaining tests in the same module. Only tests in the same module as the failed setup test are skipped; other test modules continue to run as usual.
+
+The module-scoped `juju_factory` fixture's own teardown still runs, so any models that were created are still destroyed (unless `--no-juju-teardown` is also passed). Tests marked with [juju_teardown](#juju_teardown) in the failed module are skipped along with the rest, since the module's setup is by definition incomplete and per-test cleanup is likely to act on objects that were never created.
+
+**Usage:**
+
+```shell
+pytest tests/integration --juju-skip-on-failure
+```
+
+
 ### `--juju-dump-logs`
 
 When all the tests in a module have completed, but prior to tearing down the models owned by a [juju_factory](#juju_factory), dump the `juju debug-log` for each managed model into the specified directory.

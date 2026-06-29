@@ -31,6 +31,8 @@ _LOG_LIMIT = 1000  # Number of log lines to dump to stderr on failure.
 
 # Unique per-session key to stash the model prefix for later output.
 _MODEL_PREFIX_KEY = pytest.StashKey[str]()
+# Per-module stash key marking that a juju_setup test in the module has failed.
+_SETUP_FAILED_KEY = pytest.StashKey[str]()
 
 
 def pytest_addoption(parser: pytest.Parser):
@@ -74,6 +76,15 @@ def pytest_addoption(parser: pytest.Parser):
         action="store_true",
         default=False,
         help="Switch to the temporary model that is currently being worked on.",
+    )
+    group.addoption(
+        "--juju-skip-on-failure",
+        action="store_true",
+        default=False,
+        help=(
+            'Skip the rest of a test module if a test marked "juju_setup" in that module fails. '
+            "Other test modules continue to run as usual."
+        ),
     )
     group.addoption(
         "--juju-dump-logs",
@@ -152,6 +163,53 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         for item in items:
             if "juju_setup" in item.keywords:
                 item.add_marker(skipper)
+
+
+def pytest_runtest_setup(item: pytest.Item):
+    """Skip the test if a ``juju_setup`` test in the same module has already failed.
+
+    Only active when ``--juju-skip-on-failure`` is set. Tests marked
+    ``juju_teardown`` are still skipped along with the rest of the module, since
+    the module's setup is by definition incomplete and any per-test cleanup is
+    likely to act on objects that were never created. The module-scoped
+    ``juju_factory`` fixture's own teardown still runs, so created models are
+    still destroyed unless ``--no-juju-teardown`` was also passed.
+
+    Pytest hook: https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_runtest_setup
+    """
+    if not item.config.getoption("--juju-skip-on-failure"):
+        return
+    module = item.parent
+    if module is None:
+        return
+    failed_nodeid = module.stash.get(_SETUP_FAILED_KEY, default=None)
+    if failed_nodeid is None:
+        return
+    pytest.skip(
+        f"--juju-skip-on-failure: a juju_setup test in this module failed ({failed_nodeid})."
+    )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
+    """Record juju_setup test failures so the rest of the module can be skipped.
+
+    Pytest hook: https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_runtest_makereport
+    """
+    outcome = yield
+    if not item.config.getoption("--juju-skip-on-failure"):
+        return
+    if "juju_setup" not in item.keywords:
+        return
+    report: pytest.TestReport = outcome.get_result()
+    if report.when != "call" or not report.failed:
+        return
+    module = item.parent
+    if module is None:
+        return
+    # First failing juju_setup test wins; later ones don't overwrite the record.
+    if _SETUP_FAILED_KEY not in module.stash:
+        module.stash[_SETUP_FAILED_KEY] = item.nodeid
 
 
 class JujuFactory(typing.Protocol):
