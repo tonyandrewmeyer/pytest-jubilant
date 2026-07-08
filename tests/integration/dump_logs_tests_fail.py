@@ -29,4 +29,10 @@ def test_deploy_and_then_fail(
     bar.deploy(log_actions_charm, app="log")
     foo.wait(jubilant.all_active, timeout=900)
     bar.wait(jubilant.all_active)
-    foo.run("log/0", "log", {"fail": True})
+    # Run the log action successfully — the action returns only once all
+    # `juju-log` calls have completed, so Juju has already ingested the log
+    # lines by the time we trigger the failure below. Failing the action itself
+    # would race the model teardown against Juju's server-side log ingestion,
+    # and some of the last lines were regularly missing from the dump (#58).
+    foo.run("log/0", "log")
+    pytest.fail("Failing on purpose for tests.")
