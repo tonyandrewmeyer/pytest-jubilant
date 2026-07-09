@@ -61,6 +61,38 @@ def test_dump_logs_custom_path(pytester, tmp_path):
     assert bar_log_path.read_text() == "stdout patched by conftest.py"
 
 
+TEST_FILE_LOGS = """
+import logging
+
+def test_emit_log(juju_factory):
+    juju_factory.get_juju("foo")
+    logging.getLogger("jubilant").info("hello from a test")
+""".strip()
+
+
+def test_dump_logs_captures_jubilant_log(pytester, tmp_path):
+    pytester.makeconftest(CONFTEST)
+    pytester.makepyfile(test_file=TEST_FILE_LOGS)
+    custom_dir = tmp_path / "custom-logs"
+
+    result = pytester.runpytest("--juju-dump-logs", str(custom_dir))
+    result.assert_outcomes(passed=1)
+
+    jubilant_log_path = custom_dir / "jubilant.log"
+    assert jubilant_log_path.exists()
+    assert "hello from a test" in jubilant_log_path.read_text()
+
+
+def test_dump_logs_not_passed_no_jubilant_log(pytester):
+    pytester.makeconftest(CONFTEST)
+    pytester.makepyfile(test_file=TEST_FILE_LOGS)
+
+    result = pytester.runpytest()
+    result.assert_outcomes(passed=1)
+
+    assert not (pytester.path / ".logs" / "jubilant.log").exists()
+
+
 def test_juju_debug_log_on_failure(pytester, tmp_path):
     pytester.makeconftest(CONFTEST)
     pytester.makepyfile(

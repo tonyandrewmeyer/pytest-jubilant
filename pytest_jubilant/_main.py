@@ -30,8 +30,15 @@ if typing.TYPE_CHECKING:
 _LOG_WAIT = 2.0  # Time to wait before processing logs if we need them.
 _LOG_LIMIT = 1000  # Number of log lines to dump to stderr on failure.
 
+# Filename used for the session-scoped jubilant log inside the --juju-dump-logs directory.
+# One file per session (as opposed to per-model, which is what juju debug-log uses) so that
+# the dump directory can be uploaded as a single artifact from CI.
+_JUBILANT_LOG_FILENAME = "jubilant.log"
+
 # Unique per-session key to stash the model prefix for later output.
 _MODEL_PREFIX_KEY = pytest.StashKey[str]()
+# Unique per-session key to stash the jubilant log-capture handler for teardown.
+_JUBILANT_LOG_HANDLER_KEY = pytest.StashKey["logging.FileHandler"]()
 
 
 def pytest_addoption(parser: pytest.Parser):
@@ -83,8 +90,9 @@ def pytest_addoption(parser: pytest.Parser):
         const=pathlib.Path(".logs"),
         default=None,
         type=pathlib.Path,
-        help="Dump the juju debug-log for each model prior to teardown. "
-        "The default dump location is './.logs'.",
+        help="Dump the juju debug-log for each model prior to teardown, and capture "
+        "jubilant's own logs to a single 'jubilant.log' in the same directory for the "
+        "duration of the session. The default dump location is './.logs'.",
     )
 
 
@@ -111,6 +119,36 @@ def pytest_configure(config: pytest.Config):
                 ", the model(s) identified by --juju-model *will* be torn down!"
             )
         raise pytest.UsageError(msg)
+
+    # If --juju-dump-logs is set, capture jubilant's own logs to a single session-scoped
+    # file so they end up alongside the per-model juju debug-log files. This keeps the
+    # recommended CI setup simple: point actions/upload-artifact at the dump directory
+    # to collect both the jubilant logs and the juju debug-logs.
+    dump_logs = typing.cast("pathlib.Path | None", config.getoption("--juju-dump-logs"))
+    if dump_logs:
+        dump_logs.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(dump_logs / _JUBILANT_LOG_FILENAME)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+        jubilant_logger = logging.getLogger("jubilant")
+        # Only override the level if the user hasn't set one explicitly, so we don't
+        # clobber a caller who has already configured jubilant logging.
+        if jubilant_logger.level == logging.NOTSET:
+            jubilant_logger.setLevel(logging.DEBUG)
+        jubilant_logger.addHandler(handler)
+        config.stash[_JUBILANT_LOG_HANDLER_KEY] = handler
+
+
+def pytest_unconfigure(config: pytest.Config):
+    """Detach and close the jubilant log-capture handler installed by ``pytest_configure``.
+
+    Pytest hook: https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_unconfigure
+    """
+    handler = config.stash.get(_JUBILANT_LOG_HANDLER_KEY, default=None)
+    if handler is None:
+        return
+    logging.getLogger("jubilant").removeHandler(handler)
+    handler.close()
 
 
 def pytest_terminal_summary(
