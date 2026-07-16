@@ -261,11 +261,10 @@ class _JujuFactory:
                 else:
                     raise
 
-            # Match the model architecture to the runtime, like concierge does. When a cloud is
-            # explicitly chosen its machines may be a different architecture, so leave it alone.
+            # Match the model architecture to the runtime. When a cloud is explicitly chosen
+            # we are less confident about its architecture, so leave it alone.
             if created and juju_cloud is None:
                 arch = _juju_arch()
-                logger.info("Setting arch=%s constraint on model %s", arch, model_name)
                 juju.model_constraints({"arch": arch})
 
         self._models[model_name] = juju
