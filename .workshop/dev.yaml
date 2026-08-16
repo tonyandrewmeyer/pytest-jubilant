@@ -1,0 +1,21 @@
+name: dev
+base: ubuntu@26.04
+sdks:
+  - name: uv
+    channel: latest/stable
+  - name: project-tools
+
+# The checks CONTRIBUTING.md asks for before pushing. tox comes from uvx
+# rather than the SDK, matching its `uv tool install tox --with tox-uv`
+# bootstrap.
+#
+# There is deliberately no integration action. Those tests need packed charms
+# and a Juju controller to deploy them to, and an unprivileged container has
+# neither -- `tox -e integration` in here fails at collection with
+# SMOKE_CHARM_PATH unset. Run them on the host instead:
+#
+#   SMOKE_CHARM_PATH=... tox -e integration
+actions:
+  format: uvx --with tox-uv tox -e format -- "$@"
+  lint: uvx --with tox-uv tox -e lint -- "$@"
+  unit: uvx --with tox-uv tox -e unit -- "$@"
