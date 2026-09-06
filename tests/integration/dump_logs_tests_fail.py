@@ -29,4 +29,9 @@ def test_deploy_and_then_fail(
     bar.deploy(log_actions_charm, app="log")
     foo.wait(jubilant.all_active, timeout=900)
     bar.wait(jubilant.all_active)
-    foo.run("log/0", "log", {"fail": True})
+    # Don't use the action's own "fail" parameter: the action failing races with
+    # Juju finishing ingestion of the 10k log lines, so the last of them are
+    # regularly missing from the dump. Letting the action return means every line
+    # has been accepted before we fail the test ourselves. See #58.
+    foo.run("log/0", "log")
+    pytest.fail("Failing on purpose for tests.")
