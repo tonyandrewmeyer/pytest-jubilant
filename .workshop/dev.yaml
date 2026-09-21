@@ -3,6 +3,9 @@ base: ubuntu@26.04
 sdks:
   - name: uv
     channel: latest/stable
+  # `tools` installs the Pi agent harness as well as the dev tooling (node and
+  # npm are the harness's dependencies, and the mount at ~/.pi keeps its state
+  # across a `workshop refresh`). None of the actions below need it.
   - name: project-tools
 
 # The checks CONTRIBUTING.md asks for before pushing. tox comes from uvx
@@ -11,8 +14,7 @@ sdks:
 #
 # There is deliberately no integration action. Those tests need packed charms
 # and a Juju controller to deploy them to, and an unprivileged container has
-# neither -- `tox -e integration` in here fails at collection with
-# SMOKE_CHARM_PATH unset. Run them on the host instead:
+# neither. Run them on the host instead:
 #
 #   SMOKE_CHARM_PATH=... tox -e integration
 actions:
