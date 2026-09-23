@@ -45,6 +45,33 @@ def test_dump_logs_default_path(pytester):
     assert bar_log_path.read_text() == "stdout patched by conftest.py"
 
 
+def test_dump_logs_default_path_uses_log_file_directory(pytester, tmp_path):
+    pytester.makeconftest(CONFTEST)
+    pytester.makepyfile(test_file=TEST_FILE)
+    log_file = tmp_path / "pytest-logs" / "pytest.log"
+
+    result = pytester.runpytest("--juju-dump-logs", "--log-file", str(log_file))
+    result.assert_outcomes(passed=1)
+
+    foo_log_path = log_file.parent / "jubilant-deadbeef-test-file-foo-juju-debug.log"
+    assert foo_log_path.exists()
+    assert not (pytester.path / ".logs").exists()
+
+
+def test_dump_logs_default_path_ignores_log_file_when_given_explicit_path(pytester, tmp_path):
+    pytester.makeconftest(CONFTEST)
+    pytester.makepyfile(test_file=TEST_FILE)
+    log_file = tmp_path / "pytest-logs" / "pytest.log"
+    custom_dir = tmp_path / "custom-logs"
+
+    result = pytester.runpytest("--juju-dump-logs", str(custom_dir), "--log-file", str(log_file))
+    result.assert_outcomes(passed=1)
+
+    foo_log_path = custom_dir / "jubilant-deadbeef-test-file-foo-juju-debug.log"
+    assert foo_log_path.exists()
+    assert not (log_file.parent / "jubilant-deadbeef-test-file-foo-juju-debug.log").exists()
+
+
 def test_dump_logs_custom_path(pytester, tmp_path):
     pytester.makeconftest(CONFTEST)
     pytester.makepyfile(test_file=TEST_FILE)

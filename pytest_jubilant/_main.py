@@ -32,6 +32,15 @@ _LOG_WAIT = 2.0  # Time to wait before processing logs if we need them.
 # Unique per-session key to stash the model prefix for later output.
 _MODEL_PREFIX_KEY = pytest.StashKey[str]()
 
+# Directory used for --juju-dump-logs when neither an explicit path nor
+# pytest's --log-file/log_file are set.
+_DEFAULT_DUMP_LOGS_DIR = pathlib.Path(".logs")
+
+# Sentinel for "--juju-dump-logs was passed with no path", so pytest_configure
+# can resolve it against pytest's own --log-file/log_file setting once the
+# ini file has been read (pytest_addoption runs too early for that).
+_JUJU_DUMP_LOGS_USE_LOG_FILE = object()
+
 # Map Python's platform.machine() names to the architecture names Juju uses.
 # Anything not listed is passed through unchanged, since names like amd64, arm64,
 # s390x, and riscv64 already match. Compare concierge's goArchToJujuArch.
@@ -96,11 +105,12 @@ def pytest_addoption(parser: pytest.Parser):
         "--juju-dump-logs",
         action="store",
         nargs="?",
-        const=pathlib.Path(".logs"),
+        const=_JUJU_DUMP_LOGS_USE_LOG_FILE,
         default=None,
         type=pathlib.Path,
         help="Dump the juju debug-log for each model prior to teardown. "
-        "The default dump location is './.logs'.",
+        "With no path, uses the directory of pytest's --log-file/log_file if set, "
+        "otherwise './.logs'.",
     )
 
 
@@ -127,6 +137,12 @@ def pytest_configure(config: pytest.Config):
                 ", the model(s) identified by --juju-model *will* be torn down!"
             )
         raise pytest.UsageError(msg)
+
+    if config.getoption("--juju-dump-logs") is _JUJU_DUMP_LOGS_USE_LOG_FILE:
+        log_file = config.getoption("log_file")
+        config.option.juju_dump_logs = (
+            pathlib.Path(log_file).parent if log_file else _DEFAULT_DUMP_LOGS_DIR
+        )
 
 
 def pytest_terminal_summary(
