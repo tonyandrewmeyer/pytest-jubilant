@@ -3,12 +3,13 @@ name: Integration Tests
 on:
   workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   init:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       tests: ${{ steps.tests.outputs.result }}
       charms: ${{ steps.charms.outputs.result }}
@@ -37,6 +38,8 @@ jobs:
       matrix:
         charm: ${{ fromJson(needs.init.outputs.charms) }}
     runs-on: ubuntu-24.04  # matching the charms' base for destructive mode packing
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -53,6 +56,8 @@ jobs:
   test:
     needs: [init, pack]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
